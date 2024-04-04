@@ -5,10 +5,10 @@ type Config struct {
 	PubSubSubscription string
 }
 
-func Load() (*Config, error) {
+func Load(conn_string, scan_topic string) (*Config, error) {
 	// Load config using Viper or another config management tool
 	return &Config{
-		DBConnectionString: "your_connection_string",
-		PubSubSubscription: "scan-sub",
+		DBConnectionString: conn_string,
+		PubSubSubscription: scan_topic,
 	}, nil
 }
