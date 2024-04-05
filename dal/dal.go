@@ -12,8 +12,8 @@ type DAL struct {
 	db *sql.DB
 }
 
-func NewDAL(conn string) (*DAL, error) {
-	db, err := sql.Open("postgres", conn)
+func NewDAL(driver, conn string) (*DAL, error) {
+	db, err := sql.Open(driver, conn)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %w", err)
 	}

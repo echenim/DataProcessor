@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"cloud.google.com/go/pubsub"
-	"github.com/echenim/data-processor/config"
 	"github.com/echenim/data-processor/dal"
 	"github.com/echenim/data-processor/logger"
 	"github.com/echenim/data-processor/models"
@@ -18,16 +16,16 @@ type Processor struct {
 	dal *dal.DAL
 }
 
-func NewProcessor(ctx context.Context, cfg *config.Config) (*Processor, error) {
-	d, err := dal.NewDAL(cfg.DBConnectionString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize DAL: %w", err)
-	}
+// func NewProcessor(ctx context.Context, cfg *config.Config) (*Processor, error) {
+// 	d, err := dal.NewDAL(cfg.DBConnectionString)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to initialize DAL: %w", err)
+// 	}
 
-	return &Processor{dal: d}, nil
-}
+// 	return &Processor{dal: d}, nil
+// }
 
-func (p *Processor) ProcessMessage(ctx context.Context, msg *pubsub.Message) {
+func (p *Processor) ProcessMessageSingle(ctx context.Context, msg *pubsub.Message) {
 	defer msg.Ack()
 
 	var messageData struct {
