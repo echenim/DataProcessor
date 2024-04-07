@@ -4,20 +4,31 @@ import (
 	"context"
 
 	"cloud.google.com/go/pubsub"
-	"github.com/echenim/data-processor/config"
-	"github.com/echenim/data-processor/logger"
+	"github.com/sirupsen/logrus"
 )
 
-func StartSubscriber(ctx context.Context, cfg *config.Config, processMessageFunc func(context.Context, *pubsub.Message)) {
-	client, err := pubsub.NewClient(ctx, "your_project_id")
+type PubSubClient struct {
+	subscription *pubsub.Subscription
+}
+
+// NewClient now accepts a *pubsub.Client and a subscription name,
+// rather than just the configuration. This allows for more direct use
+// of the pubsub library's Subscription object.
+func NewPubSubClient(pubsubClient *pubsub.Client, subscriptionName string) *PubSubClient {
+	sub := pubsubClient.Subscription(subscriptionName)
+	return &PubSubClient{subscription: sub}
+}
+
+func (c *PubSubClient) ReceiveMessages(ctx context.Context, handleFunc func(ctx context.Context, msg *pubsub.Message)) error {
+	cctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Setup the receive configuration as needed here. This example uses synchronous pulling.
+	err := c.subscription.Receive(cctx, handleFunc)
 	if err != nil {
-		logger.Error("Failed to create Pub/Sub client:", err)
-		return
+		logrus.WithError(err).Error("Failed to receive messages")
+		return err
 	}
 
-	sub := client.Subscription(cfg.PubSubSubscription)
-	err = sub.Receive(ctx, processMessageFunc)
-	if err != nil {
-		logger.Error("Failed to receive messages:", err)
-	}
+	return nil
 }

@@ -1,4 +1,4 @@
-package config
+package backup
 
 type Config struct {
 	DBConnectionString string
@@ -6,6 +6,7 @@ type Config struct {
 }
 
 func Load(conn_string, scan_topic string) (*Config, error) {
+	// Load config using Viper or another config management tool
 	return &Config{
 		DBConnectionString: conn_string,
 		PubSubSubscription: scan_topic,
