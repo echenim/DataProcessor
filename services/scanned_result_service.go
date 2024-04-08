@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"time"
 
 	"github.com/echenim/data-processor/repositories"
 )
@@ -14,6 +15,6 @@ func NewScannedProcessorService(_processor *repositories.ScannedProcessorReposit
 	return &ScannedProcessorService{processor: _processor}
 }
 
-func (s *ScannedProcessorService) ProcessScanData(ctx context.Context) {
-	s.processor.ProcessBatchScans(ctx)
+func (s *ScannedProcessorService) ProcessScanData(ctx context.Context, subscriptionID string, batchSize int, batchTimeout time.Duration) {
+	s.processor.ProcessBatchScans(ctx, subscriptionID, batchSize, batchTimeout)
 }

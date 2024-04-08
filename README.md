@@ -36,14 +36,12 @@ data-processor/
 ├── models/
 │   └── models.go         # Data models for the application
 │
-├── pubsubclient/
-│   └── pubsubclient.go   # Google Pub/Sub client abstraction
+├── repositories/
+│   └── scan_result_processor.go   # repositories
 │
-├── dal/
-│   └── dal.go            # Database Access Layer
-│
-└── processor/
-    └── processor.go      # Business logic for processing messages
+├── services/
+│   └── scan_result_processor.go            # service  Layer
+
 
 ```
 

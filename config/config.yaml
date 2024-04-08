@@ -1,8 +1,11 @@
 database:
   driver: pgx
-  dataSourceName: "host=10.0.0.78 user=itachi password=nopassaword dbname=exchange sslmode=disable"
+  dataSourceName: "host=10.0.0.78 user=itachi password=nopassaword dbname=censyc sslmode=disable"
 log:
   root_directory: "./"
 pubsub:
   project_id: test-project
-  scan_topic: "scan-sub"
+  scan_subscription: "scan-sub"
+concurrency:
+  batch_Size: 100
+  batch_Timeout: 10*time.Minute

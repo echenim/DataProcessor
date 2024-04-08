@@ -1,0 +1,40 @@
+# Makefile for a Go project
+
+# Go parameters
+GOCMD=go
+GOBUILD=$(GOCMD) build
+GOTEST=$(GOCMD) test
+GOCLEAN=$(GOCMD) clean
+BINARY_NAME=myapp
+BINARY_UNIX=$(BINARY_NAME)_unix
+
+# Build the project
+build:
+    $(GOBUILD) -o $(BINARY_NAME) -v
+
+# Test the project
+test:
+    $(GOTEST) -v ./...
+
+# Clean build artifacts
+clean:
+    $(GOCLEAN)
+    rm -f $(BINARY_NAME)
+    rm -f $(BINARY_UNIX)
+
+# Run the project
+run: build
+    ./$(BINARY_NAME)
+
+# Cross-compile for Unix systems
+build-linux:
+    GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(BINARY_UNIX) -v
+
+# Commands to execute when just typing `make` or `make help`
+help:
+    @echo "Available commands:"
+    @echo "  make build      - Compile the project."
+    @echo "  make test       - Run tests."
+    @echo "  make clean      - Clean build artifacts."
+    @echo "  make run        - Build and run the project."
+    @echo "  make build-linux - Cross-compile for Linux."

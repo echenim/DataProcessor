@@ -25,25 +25,27 @@ func NewScannedProcessorRepository(pubsubClient *pubsub.Client, dbClient *sql.DB
 	}
 }
 
-// PubSub implmentation
-// ProcessBatchScans processes messages in batches rather than individually.
-func (r *ScannedProcessorRepository) ProcessBatchScans(ctx context.Context) {
-	subscriptionID := "scan-sub"
-	batchSize := 100
-	batchTimeout := 2 * time.Minute
+// ProcessBatchScans listens for messages from a Pub/Sub subscription and processes them in batches.
+func (r *ScannedProcessorRepository) ProcessBatchScans(ctx context.Context, subscriptionID string, batchSize int, batchTimeout time.Duration) {
+	// Define the subscription ID, batch size, and batch processing timeout.
+	// subscriptionID := "scan-sub"
+	// batchSize := 100
+	// batchTimeout := 2 * time.Minute
 
+	// Get the subscription from the Pub/Sub client.
 	sub := r.pubSubClient.Subscription(subscriptionID)
 
-	// Adjust the overall timeout as needed
+	// Set a longer timeout for the entire batch processing operation.
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
+	defer cancel() // Ensure any resources are freed on exit.
 
-	// Create a channel to collect messages
+	// Create a channel to receive messages from the subscription.
 	msgChan := make(chan *pubsub.Message)
 
+	// Start a goroutine to receive messages and send them to the channel.
 	go func() {
 		err := sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-			// Simply send the message to the channel without processing it here
+			// Forward messages to the channel without processing them here.
 			msgChan <- msg
 		})
 		if err != nil {
@@ -51,50 +53,52 @@ func (r *ScannedProcessorRepository) ProcessBatchScans(ctx context.Context) {
 		}
 	}()
 
-	// Process messages in batches
+	// Continuously process messages until the context is done.
 	for {
 		select {
 		case <-ctx.Done():
-			return // Exit if the context is done
+			return // Terminate if the context's deadline is exceeded or cancelled.
 		case msg := <-msgChan:
+			// Initialize the batch with the first received message.
 			batch := make([]*pubsub.Message, 0, batchSize)
 			batch = append(batch, msg)
 
+			// Attempt to fill the batch until the batch size is reached or a timeout occurs.
 		BatchLoop:
 			for i := 1; i < batchSize; i++ {
 				select {
 				case msg := <-msgChan:
 					batch = append(batch, msg)
 				case <-time.After(batchTimeout):
-					break BatchLoop // Break if no messages are received within the timeout
+					break BatchLoop // Exit the loop if the timeout is reached before the batch is full.
 				}
 			}
 
-			// Process the batch
-			r.processBatch(ctx, batch)
+			// Process the messages in the batch.
+			go r.processBatch(ctx, batch)
 		}
 	}
 }
 
+// processBatch processes a batch of Pub/Sub messages by converting them into scanned results and inserting them into a database.
 func (r *ScannedProcessorRepository) processBatch(ctx context.Context, batch []*pubsub.Message) {
 	processedResult := make([]models.ScannedResult, 0, len(batch))
 	for _, msg := range batch {
+		// Decode each message into a Scan object.
 		var scan models.Scan
 		if err := json.Unmarshal(msg.Data, &scan); err != nil {
 			log.Printf("Could not decode message data: %v", err)
-			msg.Nack()
+			msg.Nack() // Signal that the message was not processed successfully.
 			continue
 		}
 
+		// Convert the decoded message to a ScannedResult and add it to the batch.
 		processedResult = append(processedResult, r.convertToScannedResult(scan))
-		msg.Ack()
+		msg.Ack() // Acknowledge successful processing of the message.
 	}
 
-	log.Printf("Processed a batch of %d scans\n", len(processedResult))
-	log.Printf("scans records : %v\n", processedResult)
-
-	// bulk insert into a database
-	//r.insertBatch(ctx, processedResult)
+	// Insert the processed results into the database as a batch.
+	r.insertBatch(ctx, processedResult)
 }
 
 // ConvertToScannedResult transforms a Scan struct to a ScannedResult struct.
@@ -113,8 +117,6 @@ func (*ScannedProcessorRepository) unixToTime(timestamp int64) time.Time {
 	return time.Unix(timestamp, 0)
 }
 
-// Db implementation
-
 // Explanation:
 // Dynamic SQL Construction: The function dynamically constructs a single INSERT SQL statement that can insert multiple rows at once.
 // This is done by creating a parameterized placeholder string for each ScannedResult in the batch.
@@ -126,34 +128,47 @@ func (*ScannedProcessorRepository) unixToTime(timestamp int64) time.Time {
 // This approach significantly reduces the number of database operations by combining many insert operations into a single query,
 // which can improve performance when processing large volumes of data. Additionally, using the ON CONFLICT clause for upserts
 // ensures that the database maintains only the latest scan result for each unique combination of IP, port, and service.
-func (r *ScannedProcessorRepository) insertBatch(ctx context.Context, results []models.ScannedResult) error {
+
+// insertBatch inserts a batch of scanned results into the database.
+func (r *ScannedProcessorRepository) insertBatch(ctx context.Context, results []models.ScannedResult) {
+	// Check if the results slice is empty and log a message if it is.
 	if len(results) == 0 {
-		return nil // No results to process
+		log.Print("\nNo results to process\n")
+		return // Return early if there are no results to process.
 	}
 
-	// Construct the VALUES list for the INSERT statement dynamically
+	// Prepare the placeholders and arguments for the batch insert query.
+	// Dynamically construct the list of placeholders for each result.
 	valueStrings := make([]string, 0, len(results))
 	valueArgs := make([]interface{}, 0, len(results)*5)
 	for i, result := range results {
+		// For each result, add a placeholder string in the format "($1, $2, $3, $4, $5)"
+		// where the numbers will be replaced by actual values for each column.
 		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", i*5+1, i*5+2, i*5+3, i*5+4, i*5+5))
-		valueArgs = append(valueArgs, result.IP)
-		valueArgs = append(valueArgs, result.Port)
-		valueArgs = append(valueArgs, result.Service)
-		valueArgs = append(valueArgs, result.Timestamp)
-		valueArgs = append(valueArgs, result.Response)
+		// Append the actual values for each placeholder to the valueArgs slice.
+		// These will replace the placeholders in the query.
+		valueArgs = append(valueArgs, result.IP, result.Port, result.Service, result.Timestamp, result.Response)
 	}
 
+	// Construct the final SQL query string with placeholders for the batch insert.
+	// Use strings.Join to concatenate the individual value strings with commas.
 	query := fmt.Sprintf(`
 	INSERT INTO scan_results (ip, port, service, timestamp, response)
 	VALUES %s
 	ON CONFLICT (ip, port, service) DO UPDATE 
-	SET timestamp = excluded.timestamp, 
-	    response = excluded.response;
+    SET timestamp = excluded.timestamp, 
+       response = excluded.response;
 	`, strings.Join(valueStrings, ","))
 
-	_, err := r.dbClient.ExecContext(ctx, query, valueArgs...)
+	// Execute the batch insert query against the database.
+	rs, err := r.dbClient.ExecContext(ctx, query, valueArgs...)
+	// Check if there was an error during the execution of the query.
 	if err != nil {
-		return fmt.Errorf("error upserting scan results batch: %w", err)
+		// Log the error if the query execution failed.
+		log.Printf("\nerror upserting scan results batch: %v\n", err)
+		return // Return early in case of an error.
 	}
-	return nil
+
+	// Log a success message along with the result of the query execution.
+	log.Printf("\nscan results batch successful: %v\n", rs)
 }
