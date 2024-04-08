@@ -11,6 +11,13 @@ import (
 // Log is an exported Logger instance to use throughout your application.
 var Log *logrus.Logger
 
+func NewLogger() *logrus.Logger {
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.TextFormatter{})
+	logger.SetLevel(logrus.InfoLevel)
+	return logger
+}
+
 func Setup(dirPath string) {
 	Log = logrus.New()
 

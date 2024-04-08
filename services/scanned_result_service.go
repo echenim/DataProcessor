@@ -3,19 +3,17 @@ package services
 import (
 	"context"
 
-	"github.com/echenim/data-processor/models"
 	"github.com/echenim/data-processor/repositories"
 )
 
-type ScanResultService struct {
-	repo *repositories.ScanResultRepository
+type ScannedProcessorService struct {
+	processor *repositories.ScannedProcessorRepository
 }
 
-func NewScanResultService(repo *repositories.ScanResultRepository) *ScanResultService {
-	return &ScanResultService{repo: repo}
+func NewScannedProcessorService(_processor *repositories.ScannedProcessorRepository) *ScannedProcessorService {
+	return &ScannedProcessorService{processor: _processor}
 }
 
-func (s *ScanResultService) SaveScanResult(ctx context.Context, result *models.ScannedResult) error {
-	// Implement the logic to call repo.Save
-	return s.repo.Save(ctx, result)
+func (s *ScannedProcessorService) ProcessScanData(ctx context.Context) {
+	s.processor.ProcessBatchScans(ctx)
 }

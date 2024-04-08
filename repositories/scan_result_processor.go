@@ -13,13 +13,13 @@ import (
 	"github.com/echenim/data-processor/models"
 )
 
-type ScannedDataRepository struct {
+type ScannedProcessorRepository struct {
 	pubSubClient *pubsub.Client
 	dbClient     *sql.DB
 }
 
-func NewScannedDataRepository(pubsubClient *pubsub.Client, dbClient *sql.DB) *ScannedDataRepository {
-	return &ScannedDataRepository{
+func NewScannedProcessorRepository(pubsubClient *pubsub.Client, dbClient *sql.DB) *ScannedProcessorRepository {
+	return &ScannedProcessorRepository{
 		pubSubClient: pubsubClient,
 		dbClient:     dbClient,
 	}
@@ -27,8 +27,11 @@ func NewScannedDataRepository(pubsubClient *pubsub.Client, dbClient *sql.DB) *Sc
 
 // PubSub implmentation
 // ProcessBatchScans processes messages in batches rather than individually.
-func (r *ScannedDataRepository) ProcessBatchScans(ctx context.Context, batchSize int, batchTimeout time.Duration) {
+func (r *ScannedProcessorRepository) ProcessBatchScans(ctx context.Context) {
 	subscriptionID := "scan-sub"
+	batchSize := 100
+	batchTimeout := 2 * time.Minute
+
 	sub := r.pubSubClient.Subscription(subscriptionID)
 
 	// Adjust the overall timeout as needed
@@ -73,8 +76,8 @@ func (r *ScannedDataRepository) ProcessBatchScans(ctx context.Context, batchSize
 	}
 }
 
-func (r *ScannedDataRepository) processBatch(ctx context.Context, batch []*pubsub.Message) {
-	scanresults := make([]models.ScannedResult, 0, len(batch))
+func (r *ScannedProcessorRepository) processBatch(ctx context.Context, batch []*pubsub.Message) {
+	processedResult := make([]models.ScannedResult, 0, len(batch))
 	for _, msg := range batch {
 		var scan models.Scan
 		if err := json.Unmarshal(msg.Data, &scan); err != nil {
@@ -83,18 +86,19 @@ func (r *ScannedDataRepository) processBatch(ctx context.Context, batch []*pubsu
 			continue
 		}
 
-		scanresults = append(scanresults, r.ConvertToScannedResult(scan))
+		processedResult = append(processedResult, r.convertToScannedResult(scan))
 		msg.Ack()
 	}
 
-	log.Printf("Processed a batch of %d scans\n", len(scanresults))
-	log.Printf("scans records : %v\n", scanresults)
-	// Further processing with scans...
-	// e.g., bulk insert into a database
+	log.Printf("Processed a batch of %d scans\n", len(processedResult))
+	log.Printf("scans records : %v\n", processedResult)
+
+	// bulk insert into a database
+	//r.insertBatch(ctx, processedResult)
 }
 
 // ConvertToScannedResult transforms a Scan struct to a ScannedResult struct.
-func (r *ScannedDataRepository) ConvertToScannedResult(scan models.Scan) models.ScannedResult {
+func (r *ScannedProcessorRepository) convertToScannedResult(scan models.Scan) models.ScannedResult {
 	return models.ScannedResult{
 		IP:        scan.Ip,
 		Port:      scan.Port,
@@ -105,7 +109,7 @@ func (r *ScannedDataRepository) ConvertToScannedResult(scan models.Scan) models.
 }
 
 // unixToTime converts an int64 Unix timestamp to a time.Time object.
-func (*ScannedDataRepository) unixToTime(timestamp int64) time.Time {
+func (*ScannedProcessorRepository) unixToTime(timestamp int64) time.Time {
 	return time.Unix(timestamp, 0)
 }
 
@@ -122,7 +126,7 @@ func (*ScannedDataRepository) unixToTime(timestamp int64) time.Time {
 // This approach significantly reduces the number of database operations by combining many insert operations into a single query,
 // which can improve performance when processing large volumes of data. Additionally, using the ON CONFLICT clause for upserts
 // ensures that the database maintains only the latest scan result for each unique combination of IP, port, and service.
-func (r *ScannedDataRepository) SaveBatch(ctx context.Context, results []*models.ScannedResult) error {
+func (r *ScannedProcessorRepository) insertBatch(ctx context.Context, results []models.ScannedResult) error {
 	if len(results) == 0 {
 		return nil // No results to process
 	}

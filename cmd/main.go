@@ -4,32 +4,12 @@ import (
 	"context"
 	"log"
 
-	"github.com/echenim/data-processor/clients"
-	"github.com/echenim/data-processor/config"
-	"github.com/echenim/data-processor/logger"
-	"github.com/echenim/data-processor/processor"
+	"github.com/echenim/data-processor/services"
+
+	"github.com/echenim/data-processor/repositories"
+	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/spf13/viper"
 )
-
-func main() {
-	initConfig()
-
-	logger.Setup(viper.GetString("log.root_directory"))
-	cfg, err := config.Load(viper.GetString("database.dataSourceName"), viper.GetString("pubsub.scan_topic"))
-	if err != nil {
-		logger.Error("Failed to load configuration:", err)
-		return
-	}
-
-	ctx := context.Background()
-	processor, err := processor.NewProcessor(ctx, cfg)
-	if err != nil {
-		logger.Error("Failed to initialize processor:", err)
-		return
-	}
-
-	clients.StartSubscriber(ctx, cfg, processor.ProcessMessage)
-}
 
 func initConfig() {
 	viper.SetConfigName("config/config") // name of config file (without extension)
@@ -39,4 +19,24 @@ func initConfig() {
 	if err != nil {                      // Handle errors reading the config file
 		log.Fatalf("Fatal error config file: %s \n", err)
 	}
+}
+
+func main() {
+	initConfig()
+
+	db, err := repositories.PostgreSQlProviderClient(viper.GetString("database.driver"), viper.GetString("database.dataSourceName"))
+	if err != nil {
+		log.Printf("\n Error : %v", err)
+	}
+
+	pubsub, err := repositories.PubSubProviderClient(viper.GetString("pubsub.project_id"))
+	if err != nil {
+		log.Printf("\n Error : %v", err)
+	}
+
+	repo := repositories.NewScannedProcessorRepository(pubsub, db)
+
+	srv := services.NewScannedProcessorService(repo)
+
+	srv.ProcessScanData(context.Background())
 }

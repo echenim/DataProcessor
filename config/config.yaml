@@ -1,7 +1,8 @@
 database:
-  driver: "pgx"
+  driver: pgx
   dataSourceName: "host=10.0.0.78 user=itachi password=nopassaword dbname=exchange sslmode=disable"
 log:
   root_directory: "./"
 pubsub:
+  project_id: test-project
   scan_topic: "scan-sub"

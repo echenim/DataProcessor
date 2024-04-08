@@ -4,16 +4,18 @@ import (
 	"context"
 	"database/sql"
 
+	_ "github.com/jackc/pgx/v4"
+
 	"cloud.google.com/go/pubsub"
 )
 
-func PubSubProviderClient(ctx context.Context, project_id string) (*pubsub.Client, error) {
-	c, err := pubsub.NewClient(ctx, project_id)
+func PubSubProviderClient(project_id string) (*pubsub.Client, error) {
+	c, err := pubsub.NewClient(context.Background(), project_id)
 	if err != nil {
 		return nil, err
 	}
 
-	defer c.Close()
+	// defer c.Close()
 
 	return c, nil
 }
