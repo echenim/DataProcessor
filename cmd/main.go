@@ -6,9 +6,9 @@ import (
 
 	//	"time"
 
-	"github.com/echenim/data-processor/services"
+	"github.com/echenim/data-processor/internal/services"
 
-	"github.com/echenim/data-processor/repositories"
+	repositories "github.com/echenim/data-processor/internal/engine"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/spf13/viper"
 )

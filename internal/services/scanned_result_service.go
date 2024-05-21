@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/echenim/data-processor/repositories"
+	"github.com/echenim/data-processor/internal/engine"
 )
 
 type ScannedProcessorService struct {

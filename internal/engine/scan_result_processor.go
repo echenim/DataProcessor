@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub"
-	"github.com/echenim/data-processor/models"
+	"github.com/echenim/data-processor/internal/models"
 )
 
 type ScannedProcessorRepository struct {
